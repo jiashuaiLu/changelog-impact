@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { saveConfig, getDefaultProviders } from '../config.js';
+import { saveConfig, getDefaultSources, getDefaultLLM } from '../config.js';
 import { AppConfig } from '../types.js';
 
 export function runInit(cwd: string): void {
@@ -12,12 +12,14 @@ export function runInit(cwd: string): void {
   }
 
   const config: AppConfig = {
-    providers: getDefaultProviders(),
+    sources: getDefaultSources(),
     repo: '.',
+    llm: getDefaultLLM(),
   };
 
   saveConfig(cwd, config);
   console.log(`Created config file: ${configPath}`);
   console.log('');
-  console.log('Edit it to customize providers and scan patterns.');
+  console.log('To enable LLM features, set llm.enabled to true and add your OPENAI_API_KEY.');
+  console.log('To add custom GitHub repos, add sources with type "github-repo".');
 }

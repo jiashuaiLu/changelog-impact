@@ -57,8 +57,8 @@ const IGNORE_DIRS = new Set([
   '.cache', '.turbo', 'vendor', '__pycache__',
 ]);
 
-function getPatternsForProvider(provider: string): RegExp[] {
-  switch (provider) {
+function getPatternsForSource(source: string): RegExp[] {
+  switch (source) {
     case 'stripe': return STRIPE_PATTERNS;
     case 'openai': return OPENAI_PATTERNS;
     default: return [];
@@ -126,24 +126,24 @@ function walkDir(dir: string, repoPath: string): string[] {
 export function scanRepo(
   repoPath: string,
   entries: ChangelogEntry[],
-  provider?: string,
+  sourceFilter?: string,
 ): ScanResult[] {
   const files = walkDir(repoPath, repoPath);
   const results: ScanResult[] = [];
 
-  const providerNames = new Set<string>();
+  const sourceNames = new Set<string>();
   for (const entry of entries) {
-    providerNames.add(entry.provider);
+    sourceNames.add(entry.source);
   }
-  if (provider) {
-    providerNames.clear();
-    providerNames.add(provider);
+  if (sourceFilter) {
+    sourceNames.clear();
+    sourceNames.add(sourceFilter);
   }
 
   for (const entry of entries) {
-    if (!providerNames.has(entry.provider)) continue;
+    if (!sourceNames.has(entry.source)) continue;
 
-    const patterns = getPatternsForProvider(entry.provider);
+    const patterns = getPatternsForSource(entry.source);
     if (patterns.length === 0) continue;
 
     const hits: ScanHit[] = [];

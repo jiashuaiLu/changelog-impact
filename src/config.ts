@@ -2,18 +2,29 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import yaml from 'js-yaml';
-import { AppConfig, ProviderConfig } from './types.js';
+import { AppConfig, SourceConfig, LLMConfig } from './types.js';
 
 const CONFIG_FILENAME = 'changelog-impact.yaml';
 const CACHE_DIR = path.join(os.homedir(), '.changelog-impact', 'cache');
 
-const DEFAULT_PROVIDERS: ProviderConfig[] = [
-  { name: 'stripe', enabled: true },
-  { name: 'openai', enabled: true },
+const DEFAULT_SOURCES: SourceConfig[] = [
+  { name: 'stripe', type: 'changelog', enabled: true },
+  { name: 'openai', type: 'changelog', enabled: true },
 ];
 
-export function getDefaultProviders(): ProviderConfig[] {
-  return DEFAULT_PROVIDERS;
+const DEFAULT_LLM: LLMConfig = {
+  enabled: false,
+  provider: 'openai',
+  model: 'gpt-4o-mini',
+  maxTokens: 1024,
+};
+
+export function getDefaultSources(): SourceConfig[] {
+  return DEFAULT_SOURCES;
+}
+
+export function getDefaultLLM(): LLMConfig {
+  return { ...DEFAULT_LLM };
 }
 
 export function loadConfig(cwd: string): AppConfig | null {

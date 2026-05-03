@@ -1,56 +1,69 @@
-import { resolveRepoPath, getDefaultProviders, ensureReportsDir } from '../config.js';
-import { StripeProvider } from '../providers/stripe.js';
-import { OpenAIProvider } from '../providers/openai.js';
-import { classifyEntries } from '../classifier.js';
+import { resolveRepoPath, getDefaultSources, ensureReportsDir, loadConfig } from '../config.js';
+import { StripeSource } from '../sources/stripe.js';
+import { OpenAISource } from '../sources/openai.js';
+import { GitHubRepoSource } from '../sources/github-repo.js';
+import { classifyEntriesWithLLM } from '../classifier.js';
 import { writeCache, readCache, diffEntries } from '../cache.js';
 import { scanRepo } from '../scanner.js';
 import { buildReportData, writeReport } from '../reporter.js';
-import { Provider } from '../providers/types.js';
+import { enrichScanResultsWithLLM, resolveLLMConfig } from '../llm.js';
+import { Source } from '../sources/types.js';
 
 export async function runRun(
   cwd: string,
-  options: { repo?: string; provider?: string; since?: string },
+  options: { repo?: string; source?: string; since?: string },
 ): Promise<void> {
   const repoPath = resolveRepoPath(options.repo, cwd);
   const since = options.since || '1970-01-01';
-  const providerName = options.provider;
+  const sourceName = options.source;
 
-  const defaultProviders = getDefaultProviders().filter((p) => p.enabled);
-  const providers: Provider[] = [];
+  const config = loadConfig(cwd);
+  const enabledSources = (config?.sources || getDefaultSources())
+    .filter((s) => s.enabled);
 
-  for (const p of defaultProviders) {
-    if (providerName && p.name !== providerName) continue;
-    switch (p.name) {
-      case 'stripe': providers.push(new StripeProvider()); break;
-      case 'openai': providers.push(new OpenAIProvider()); break;
+  const sources: Source[] = [];
+  for (const s of enabledSources) {
+    if (sourceName && s.name !== sourceName) continue;
+
+    switch (s.type) {
+      case 'changelog':
+        if (s.name === 'stripe') sources.push(new StripeSource());
+        if (s.name === 'openai') sources.push(new OpenAISource());
+        break;
+      case 'github-repo':
+        if (s.repo) sources.push(new GitHubRepoSource(s.name, s.repo, s.branch));
+        break;
     }
   }
 
-  if (providers.length === 0) {
-    console.error('No providers configured. Run "changelog-impact init" first.');
+  if (sources.length === 0) {
+    console.error('No sources configured. Run "changelog-impact init" first.');
     process.exit(1);
   }
 
-  for (const provider of providers) {
-    console.log(`[${provider.name}] Fetching changelog...`);
+  for (const source of sources) {
+    const sourceConfig = enabledSources.find((s) => s.name === source.name);
+    const sourceType = sourceConfig?.type || source.type;
+
+    console.log(`[${source.name}] Fetching...`);
     let entries;
     try {
-      entries = await provider.fetch();
-      entries = classifyEntries(entries);
+      entries = await source.fetch();
+      entries = await classifyEntriesWithLLM(entries, config?.llm);
 
-      const previous = readCache(provider.name);
+      const previous = readCache(source.name);
       const newEntries = previous ? diffEntries(previous.entries, entries) : entries;
 
-      writeCache(provider.name, entries);
+      writeCache(source.name, entries);
       console.log(`  Total: ${entries.length} entries, ${newEntries.length} new`);
     } catch (err) {
       console.error(`  Fetch error: ${err}`);
-      const cached = readCache(provider.name);
+      const cached = readCache(source.name);
       if (cached) {
         entries = cached.entries;
         console.log(`  Using cached data (${entries.length} entries)`);
       } else {
-        console.error(`  No cached data available. Skipping ${provider.name}.`);
+        console.error(`  No cached data available. Skipping ${source.name}.`);
         continue;
       }
     }
@@ -62,14 +75,20 @@ export async function runRun(
       });
     }
 
-    console.log(`[${provider.name}] Scanning repo...`);
-    const results = scanRepo(repoPath, entries, provider.name);
+    console.log(`[${source.name}] Scanning repo...`);
+    let results = scanRepo(repoPath, entries, source.name);
+
+    const llmConfig = resolveLLMConfig(config?.llm);
+    if (llmConfig && results.some((r) => r.hits.length > 0)) {
+      console.log(`  Enriching results with LLM...`);
+      results = await enrichScanResultsWithLLM(results, llmConfig);
+    }
 
     const totalHits = results.reduce((sum, r) => sum + r.hits.length, 0);
     const impactedCount = results.filter((r) => r.hits.length > 0).length;
     console.log(`  ${totalHits} hits across ${impactedCount} impacted entries`);
 
-    const reportData = buildReportData(provider.name, results, since);
+    const reportData = buildReportData(source.name, sourceType, results, since);
     const reportsDir = ensureReportsDir(repoPath);
     const reportPath = writeReport(reportData, reportsDir);
     console.log(`  Report: ${reportPath}`);

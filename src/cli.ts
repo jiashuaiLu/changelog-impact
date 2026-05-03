@@ -11,8 +11,8 @@ const program = new Command();
 
 program
   .name('changelog-impact')
-  .description('Track Stripe/OpenAI changes. Find impacted code. Generate upgrade issues.')
-  .version('0.1.0');
+  .description('Track upstream changes. Find impacted code. Generate upgrade issues. LLM-powered impact analysis.')
+  .version('0.2.0');
 
 program
   .command('init')
@@ -23,22 +23,22 @@ program
 
 program
   .command('fetch')
-  .description('Fetch changelog entries from providers')
-  .option('-p, --provider <provider>', 'Only fetch a specific provider (stripe|openai)')
+  .description('Fetch changelog entries from configured sources')
+  .option('-s, --source <name>', 'Only fetch a specific source')
   .action(async (opts) => {
-    await runFetch(process.cwd(), { provider: opts.provider });
+    await runFetch(process.cwd(), { source: opts.source });
   });
 
 program
   .command('scan')
   .description('Scan repo for impacted code using cached changelog data')
   .option('-r, --repo <path>', 'Path to the repo to scan', '.')
-  .option('-p, --provider <provider>', 'Only scan for a specific provider (stripe|openai)')
-  .option('-s, --since <date>', 'Only consider changes since this date (YYYY-MM-DD)')
-  .action((opts) => {
-    runScan(process.cwd(), {
+  .option('-s, --source <name>', 'Only scan for a specific source')
+  .option('--since <date>', 'Only consider changes since this date (YYYY-MM-DD)')
+  .action(async (opts) => {
+    await runScan(process.cwd(), {
       repo: opts.repo,
-      provider: opts.provider,
+      source: opts.source,
       since: opts.since,
     });
   });
@@ -47,12 +47,12 @@ program
   .command('run')
   .description('Fetch changelog + scan repo + generate report (all-in-one)')
   .option('-r, --repo <path>', 'Path to the repo to scan', '.')
-  .option('-p, --provider <provider>', 'Only process a specific provider (stripe|openai)')
-  .option('-s, --since <date>', 'Only consider changes since this date (YYYY-MM-DD)')
+  .option('-s, --source <name>', 'Only process a specific source')
+  .option('--since <date>', 'Only consider changes since this date (YYYY-MM-DD)')
   .action(async (opts) => {
     await runRun(process.cwd(), {
       repo: opts.repo,
-      provider: opts.provider,
+      source: opts.source,
       since: opts.since,
     });
   });

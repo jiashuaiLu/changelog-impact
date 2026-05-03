@@ -1,55 +1,65 @@
-import { loadConfig, resolveRepoPath, getDefaultProviders } from '../config.js';
-import { StripeProvider } from '../providers/stripe.js';
-import { OpenAIProvider } from '../providers/openai.js';
-import { classifyEntries } from '../classifier.js';
+import { loadConfig, getDefaultSources } from '../config.js';
+import { StripeSource } from '../sources/stripe.js';
+import { OpenAISource } from '../sources/openai.js';
+import { GitHubRepoSource } from '../sources/github-repo.js';
+import { classifyEntriesWithLLM } from '../classifier.js';
 import { writeCache, readCache, diffEntries } from '../cache.js';
-import { Provider } from '../providers/types.js';
+import { Source } from '../sources/types.js';
 import { ChangelogEntry } from '../types.js';
 
-export async function runFetch(cwd: string, options?: { provider?: string }): Promise<void> {
+export async function runFetch(cwd: string, options?: { source?: string }): Promise<void> {
   const config = loadConfig(cwd);
-  const enabledProviders = (config?.providers || getDefaultProviders())
-    .filter((p) => p.enabled);
+  const enabledSources = (config?.sources || getDefaultSources())
+    .filter((s) => s.enabled);
 
-  if (options?.provider) {
-    const filtered = enabledProviders.filter((p) => p.name === options.provider);
+  if (options?.source) {
+    const filtered = enabledSources.filter((s) => s.name === options.source);
     if (filtered.length === 0) {
-      console.error(`Provider "${options.provider}" is not enabled. Check your config.`);
+      console.error(`Source "${options.source}" is not enabled. Check your config.`);
       process.exit(1);
     }
   }
 
-  const providers: Provider[] = [];
-  for (const p of enabledProviders) {
-    if (options?.provider && p.name !== options.provider) continue;
-    switch (p.name) {
-      case 'stripe': providers.push(new StripeProvider()); break;
-      case 'openai': providers.push(new OpenAIProvider()); break;
+  const sources: Source[] = [];
+  for (const s of enabledSources) {
+    if (options?.source && s.name !== options.source) continue;
+
+    switch (s.type) {
+      case 'changelog':
+        if (s.name === 'stripe') sources.push(new StripeSource());
+        if (s.name === 'openai') sources.push(new OpenAISource());
+        break;
+      case 'github-repo':
+        if (s.repo) sources.push(new GitHubRepoSource(s.name, s.repo, s.branch));
+        break;
     }
   }
 
-  for (const provider of providers) {
-    console.log(`Fetching ${provider.name} changelog...`);
+  for (const source of sources) {
+    console.log(`Fetching ${source.name} (${source.type})...`);
     try {
-      const entries = await provider.fetch();
-      const classified = classifyEntries(entries);
+      let entries = await source.fetch();
+      entries = await classifyEntriesWithLLM(entries, config?.llm);
 
-      const previous = readCache(provider.name);
-      const newEntries = previous ? diffEntries(previous.entries, classified) : classified;
+      const previous = readCache(source.name);
+      const newEntries = previous ? diffEntries(previous.entries, entries) : entries;
 
-      writeCache(provider.name, classified);
+      writeCache(source.name, entries);
 
-      console.log(`  Total entries: ${classified.length}`);
+      console.log(`  Total entries: ${entries.length}`);
       console.log(`  New entries: ${newEntries.length}`);
 
-      for (const entry of newEntries) {
+      for (const entry of newEntries.slice(0, 20)) {
         const cat = categoryLabel(entry);
         console.log(`  ${cat} ${entry.title}`);
         if (entry.link) console.log(`    → ${entry.link}`);
       }
+      if (newEntries.length > 20) {
+        console.log(`  ... and ${newEntries.length - 20} more`);
+      }
       console.log('');
     } catch (err) {
-      console.error(`  Error fetching ${provider.name}: ${err}`);
+      console.error(`  Error fetching ${source.name}: ${err}`);
     }
   }
 }

@@ -26,7 +26,7 @@ describe('scanner', () => {
     });
 
     const entries: ChangelogEntry[] = [
-      { title: 'Stripe API update', date: '2026-01-01', link: 'https://example.com', category: 'breaking', summary: 'paymentIntents changed', provider: 'stripe' },
+      { title: 'Stripe API update', date: '2026-01-01', link: 'https://example.com', category: 'breaking', summary: 'paymentIntents changed', source: 'stripe', sourceType: 'changelog' },
     ];
 
     const results = scanRepo(repoDir, entries, 'stripe');
@@ -47,7 +47,7 @@ describe('scanner', () => {
     });
 
     const entries: ChangelogEntry[] = [
-      { title: 'OpenAI model update', date: '2026-01-01', link: 'https://example.com', category: 'deprecation', summary: 'gpt-4 deprecated', provider: 'openai' },
+      { title: 'OpenAI model update', date: '2026-01-01', link: 'https://example.com', category: 'deprecation', summary: 'gpt-4 deprecated', source: 'openai', sourceType: 'changelog' },
     ];
 
     const results = scanRepo(repoDir, entries, 'openai');
@@ -65,7 +65,7 @@ describe('scanner', () => {
     });
 
     const entries: ChangelogEntry[] = [
-      { title: 'Stripe update', date: '2026-01-01', link: '', category: 'feature', summary: '', provider: 'stripe' },
+      { title: 'Stripe update', date: '2026-01-01', link: '', category: 'feature', summary: '', source: 'stripe', sourceType: 'changelog' },
     ];
 
     const results = scanRepo(repoDir, entries, 'stripe');
@@ -83,7 +83,7 @@ describe('scanner', () => {
     });
 
     const entries: ChangelogEntry[] = [
-      { title: 'Stripe update', date: '2026-01-01', link: '', category: 'feature', summary: '', provider: 'stripe' },
+      { title: 'Stripe update', date: '2026-01-01', link: '', category: 'feature', summary: '', source: 'stripe', sourceType: 'changelog' },
     ];
 
     const results = scanRepo(repoDir, entries, 'stripe');

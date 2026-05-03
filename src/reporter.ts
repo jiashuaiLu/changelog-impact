@@ -7,7 +7,7 @@ export function generateReport(data: ReportData): string {
 
   lines.push(`# Changelog Impact Report`);
   lines.push('');
-  lines.push(`**Provider**: ${data.provider}`);
+  lines.push(`**Source**: ${data.source} (${data.sourceType})`);
   lines.push(`**Period**: ${data.since} ~ ${data.until}`);
   lines.push('');
   lines.push('## Overview');
@@ -39,8 +39,16 @@ export function generateReport(data: ReportData): string {
     lines.push(`- **Link**: ${entry.link}`);
     lines.push('');
 
-    if (entry.summary) {
-      lines.push(`> ${entry.summary}`);
+    const displaySummary = entry.llmSummary || entry.summary;
+    if (displaySummary) {
+      lines.push(`> ${displaySummary}`);
+      lines.push('');
+    }
+
+    if (entry.llmImpactExplanation) {
+      lines.push(`**Why this affects your code**:`);
+      lines.push('');
+      lines.push(entry.llmImpactExplanation);
       lines.push('');
     }
 
@@ -52,23 +60,31 @@ export function generateReport(data: ReportData): string {
         lines.push(`  \`${hit.snippet}\``);
       }
       lines.push('');
-      lines.push('**Suggested actions**:');
-      lines.push('');
-      lines.push(`1. Review the change: ${entry.link}`);
-      lines.push('2. Check each impacted file listed above');
-      if (entry.category === 'breaking') {
-        lines.push('3. Update the affected API calls to match the new interface');
-        lines.push('4. Run your test suite to verify nothing is broken');
-      } else if (entry.category === 'deprecation') {
-        lines.push('3. Plan migration away from the deprecated feature');
-        lines.push('4. Set a deadline before the feature is removed');
-      } else if (entry.category === 'security') {
-        lines.push('3. Apply the security patch immediately');
-        lines.push('4. Audit for potential vulnerabilities in your usage');
+
+      if (entry.llmMigrationSuggestion) {
+        lines.push(`**Migration steps**:`);
+        lines.push('');
+        lines.push(entry.llmMigrationSuggestion);
+        lines.push('');
       } else {
-        lines.push('3. Evaluate if the new feature is relevant to your use case');
+        lines.push('**Suggested actions**:');
+        lines.push('');
+        lines.push(`1. Review the change: ${entry.link}`);
+        lines.push('2. Check each impacted file listed above');
+        if (entry.category === 'breaking') {
+          lines.push('3. Update the affected API calls to match the new interface');
+          lines.push('4. Run your test suite to verify nothing is broken');
+        } else if (entry.category === 'deprecation') {
+          lines.push('3. Plan migration away from the deprecated feature');
+          lines.push('4. Set a deadline before the feature is removed');
+        } else if (entry.category === 'security') {
+          lines.push('3. Apply the security patch immediately');
+          lines.push('4. Audit for potential vulnerabilities in your usage');
+        } else {
+          lines.push('3. Evaluate if the new feature is relevant to your use case');
+        }
+        lines.push('');
       }
-      lines.push('');
     } else {
       lines.push('**No direct impact detected in your codebase.**');
       lines.push('');
@@ -83,7 +99,7 @@ export function generateReport(data: ReportData): string {
 
 export function writeReport(data: ReportData, reportsDir: string): string {
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `${date}-${data.provider}.md`;
+  const filename = `${date}-${data.source}.md`;
   const filepath = path.join(reportsDir, filename);
   const content = generateReport(data);
   fs.writeFileSync(filepath, content, 'utf-8');
@@ -91,7 +107,8 @@ export function writeReport(data: ReportData, reportsDir: string): string {
 }
 
 export function buildReportData(
-  provider: string,
+  source: string,
+  sourceType: string,
   results: ScanResult[],
   since: string,
 ): ReportData {
@@ -111,7 +128,8 @@ export function buildReportData(
   }
 
   return {
-    provider,
+    source,
+    sourceType: sourceType as ReportData['sourceType'],
     since,
     until: now,
     breakingCount,

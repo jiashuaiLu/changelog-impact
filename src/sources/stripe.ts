@@ -1,12 +1,13 @@
 import { request } from 'undici';
 import { parse as parseHtml } from 'node-html-parser';
 import { ChangelogEntry } from '../types.js';
-import { Provider } from './types.js';
+import { Source } from './types.js';
 
 const STRIPE_CHANGELOG_URL = 'https://docs.stripe.com/changelog';
 
-export class StripeProvider implements Provider {
+export class StripeSource implements Source {
   name = 'stripe';
+  type = 'changelog';
 
   async fetch(): Promise<ChangelogEntry[]> {
     const html = await this.fetchPage(STRIPE_CHANGELOG_URL);
@@ -16,7 +17,7 @@ export class StripeProvider implements Provider {
   private async fetchPage(url: string): Promise<string> {
     const { statusCode, body } = await request(url, {
       headers: {
-        'User-Agent': 'changelog-impact/0.1.0',
+        'User-Agent': 'changelog-impact/0.2.0',
         Accept: 'text/html',
       },
     });
@@ -49,7 +50,8 @@ export class StripeProvider implements Provider {
             link: link.startsWith('http') ? link : `https://docs.stripe.com${link}`,
             category: 'feature',
             summary: summary.slice(0, 300),
-            provider: 'stripe',
+            source: 'stripe',
+            sourceType: 'changelog',
           });
         }
       }
@@ -76,7 +78,8 @@ export class StripeProvider implements Provider {
           link: href.startsWith('http') ? href : `https://docs.stripe.com${href}`,
           category: 'feature',
           summary: '',
-          provider: 'stripe',
+          source: 'stripe',
+          sourceType: 'changelog',
         });
       }
     }

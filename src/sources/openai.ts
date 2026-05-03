@@ -1,6 +1,6 @@
 import { request } from 'undici';
 import { ChangelogEntry } from '../types.js';
-import { Provider } from './types.js';
+import { Source } from './types.js';
 
 const GITHUB_API_BASE = 'https://api.github.com/repos/openai/openai-node';
 
@@ -12,8 +12,9 @@ interface GitHubRelease {
   published_at: string;
 }
 
-export class OpenAIProvider implements Provider {
+export class OpenAISource implements Source {
   name = 'openai';
+  type = 'changelog';
 
   async fetch(): Promise<ChangelogEntry[]> {
     const releases = await this.fetchGitHubReleases();
@@ -23,7 +24,7 @@ export class OpenAIProvider implements Provider {
   private async fetchGitHubReleases(): Promise<GitHubRelease[]> {
     const { statusCode, body } = await request(`${GITHUB_API_BASE}/releases?per_page=30`, {
       headers: {
-        'User-Agent': 'changelog-impact/0.1.0',
+        'User-Agent': 'changelog-impact/0.2.0',
         Accept: 'application/vnd.github+json',
       },
     });
@@ -80,7 +81,8 @@ export class OpenAIProvider implements Provider {
         link,
         category: 'feature',
         summary,
-        provider: 'openai',
+        source: 'openai',
+        sourceType: 'changelog',
       });
     }
 

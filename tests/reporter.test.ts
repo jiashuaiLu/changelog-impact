@@ -5,7 +5,8 @@ import { ChangelogEntry, ScanResult } from '../src/types.js';
 describe('reporter', () => {
   it('generates a markdown report with overview table', () => {
     const data = {
-      provider: 'stripe',
+      source: 'stripe',
+      sourceType: 'changelog' as const,
       since: '2026-01-01',
       until: '2026-05-01',
       breakingCount: 2,
@@ -17,7 +18,7 @@ describe('reporter', () => {
 
     const report = generateReport(data);
     expect(report).toContain('# Changelog Impact Report');
-    expect(report).toContain('**Provider**: stripe');
+    expect(report).toContain('**Source**: stripe (changelog)');
     expect(report).toContain('| Breaking | 2 |');
     expect(report).toContain('| Deprecation | 1 |');
     expect(report).toContain('| Feature | 3 |');
@@ -25,7 +26,8 @@ describe('reporter', () => {
 
   it('includes change details with hits', () => {
     const data = {
-      provider: 'openai',
+      source: 'openai',
+      sourceType: 'changelog' as const,
       since: '2026-01-01',
       until: '2026-05-01',
       breakingCount: 1,
@@ -40,7 +42,8 @@ describe('reporter', () => {
             link: 'https://platform.openai.com/docs/changelog',
             category: 'breaking' as const,
             summary: 'gpt-4 is no longer available',
-            provider: 'openai',
+            source: 'openai',
+            sourceType: 'changelog' as const,
           },
           hits: [
             { file: 'src/ai.ts', line: 5, snippet: "const model = 'gpt-4'", matchedPattern: 'gpt[- ]?4' },
@@ -58,7 +61,8 @@ describe('reporter', () => {
 
   it('handles empty results', () => {
     const data = {
-      provider: 'stripe',
+      source: 'stripe',
+      sourceType: 'changelog' as const,
       since: '2026-01-01',
       until: '2026-05-01',
       breakingCount: 0,

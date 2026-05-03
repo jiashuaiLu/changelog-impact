@@ -40,8 +40,8 @@ describe('classifier', () => {
   describe('classifyEntries', () => {
     it('classifies an array of entries', () => {
       const entries: ChangelogEntry[] = [
-        { title: 'Breaking: removed v1', date: '2026-01-01', link: '', category: 'feature', summary: '', provider: 'stripe' },
-        { title: 'New feature added', date: '2026-01-02', link: '', category: 'feature', summary: '', provider: 'stripe' },
+        { title: 'Breaking: removed v1', date: '2026-01-01', link: '', category: 'feature', summary: '', source: 'stripe', sourceType: 'changelog' },
+        { title: 'New feature added', date: '2026-01-02', link: '', category: 'feature', summary: '', source: 'stripe', sourceType: 'changelog' },
       ];
 
       const result = classifyEntries(entries);

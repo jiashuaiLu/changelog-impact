@@ -3,20 +3,20 @@ import path from 'node:path';
 import { CacheEntry, ChangelogEntry } from './types.js';
 import { ensureCacheDir } from './config.js';
 
-export function writeCache(provider: string, entries: ChangelogEntry[]): void {
+export function writeCache(source: string, entries: ChangelogEntry[]): void {
   const cacheDir = ensureCacheDir();
-  const cachePath = path.join(cacheDir, `${provider}.json`);
+  const cachePath = path.join(cacheDir, `${source}.json`);
   const entry: CacheEntry = {
-    provider,
+    source,
     fetchedAt: new Date().toISOString(),
     entries,
   };
   fs.writeFileSync(cachePath, JSON.stringify(entry, null, 2), 'utf-8');
 }
 
-export function readCache(provider: string): CacheEntry | null {
+export function readCache(source: string): CacheEntry | null {
   const cacheDir = ensureCacheDir();
-  const cachePath = path.join(cacheDir, `${provider}.json`);
+  const cachePath = path.join(cacheDir, `${source}.json`);
   if (!fs.existsSync(cachePath)) return null;
   const raw = fs.readFileSync(cachePath, 'utf-8');
   try {

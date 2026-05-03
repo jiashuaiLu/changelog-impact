@@ -1,4 +1,5 @@
-import { ChangeCategory, ChangelogEntry } from './types.js';
+import { ChangeCategory, ChangelogEntry, LLMConfig } from './types.js';
+import { classifyWithLLM, resolveLLMConfig } from './llm.js';
 
 const BREAKING_KEYWORDS = [
   'breaking change',
@@ -58,4 +59,26 @@ export function classifyEntries(entries: ChangelogEntry[]): ChangelogEntry[] {
     ...entry,
     category: classifyEntry(entry.title, entry.summary),
   }));
+}
+
+export async function classifyEntriesWithLLM(
+  entries: ChangelogEntry[],
+  llmConfig?: LLMConfig,
+): Promise<ChangelogEntry[]> {
+  const resolved = resolveLLMConfig(llmConfig);
+  if (!resolved) {
+    return classifyEntries(entries);
+  }
+
+  const results: ChangelogEntry[] = [];
+  for (const entry of entries) {
+    try {
+      const category = await classifyWithLLM(entry.title, entry.summary, resolved);
+      results.push({ ...entry, category });
+    } catch {
+      results.push({ ...entry, category: classifyEntry(entry.title, entry.summary) });
+    }
+  }
+
+  return results;
 }

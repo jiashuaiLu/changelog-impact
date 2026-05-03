@@ -1,5 +1,6 @@
 import { createGitHubIssue } from '../github.js';
 import fs from 'node:fs';
+import { ReportData } from '../types.js';
 
 export async function runGithubIssue(
   options: { repo: string; token: string; report: string },
@@ -18,11 +19,13 @@ export async function runGithubIssue(
   }
 
   const content = fs.readFileSync(reportPath, 'utf-8');
-  const providerMatch = content.match(/\*\*Provider\*:\s*(\w+)/);
+  const sourceMatch = content.match(/\*\*Source\*:\s*(\S+)/);
+  const sourceTypeMatch = content.match(/\*\*Source\*:\s*\S+\s+\((\S+)\)/);
   const sinceMatch = content.match(/\*\*Period\*:\s*(\S+)\s*~/);
   const untilMatch = content.match(/~\s*(\S+)/);
 
-  const provider = providerMatch?.[1] || 'unknown';
+  const source = sourceMatch?.[1] || 'unknown';
+  const sourceType = sourceTypeMatch?.[1] || 'changelog';
   const since = sinceMatch?.[1] || 'unknown';
   const until = untilMatch?.[1] || 'unknown';
 
@@ -31,8 +34,9 @@ export async function runGithubIssue(
   const securityMatch = content.match(/\|\s*Security\s*\|\s*(\d+)\s*\|/);
   const featureMatch = content.match(/\|\s*Feature\s*\|\s*(\d+)\s*\|/);
 
-  const data = {
-    provider,
+  const data: ReportData = {
+    source,
+    sourceType: sourceType as ReportData['sourceType'],
     since,
     until,
     breakingCount: parseInt(breakingMatch?.[1] || '0'),

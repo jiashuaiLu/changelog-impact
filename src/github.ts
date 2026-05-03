@@ -10,7 +10,7 @@ export async function createGitHubIssue(
   data: ReportData,
 ): Promise<string> {
   const content = fs.readFileSync(reportPath, 'utf-8');
-  const title = `[changelog-impact] ${data.provider} changes (${data.since} ~ ${data.until}) — ${data.breakingCount + data.deprecationCount} action items`;
+  const title = `[changelog-impact] ${data.source} changes (${data.since} ~ ${data.until}) — ${data.breakingCount + data.deprecationCount} action items`;
 
   const labels = ['changelog-impact'];
   if (data.breakingCount > 0) labels.push('breaking-change');

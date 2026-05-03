@@ -1,6 +1,7 @@
 import { ChangelogEntry } from '../types.js';
 
-export interface Provider {
+export interface Source {
   name: string;
+  type: string;
   fetch(): Promise<ChangelogEntry[]>;
 }
