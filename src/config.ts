@@ -15,8 +15,8 @@ const DEFAULT_SOURCES: SourceConfig[] = [
 const DEFAULT_LLM: LLMConfig = {
   enabled: false,
   provider: 'openai',
-  model: 'gpt-4o-mini',
-  maxTokens: 1024,
+  model: 'Kimi-K2.5',
+  maxTokens: 2048,
 };
 
 export function getDefaultSources(): SourceConfig[] {

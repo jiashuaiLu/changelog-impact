@@ -4,8 +4,8 @@ import { LLMConfig, ChangeCategory, ChangelogEntry, ScanHit } from './types.js';
 const DEFAULT_CONFIG: LLMConfig = {
   enabled: false,
   provider: 'openai',
-  model: 'gpt-4o-mini',
-  maxTokens: 1024,
+  model: 'Kimi-K2.5',
+  maxTokens: 2048,
 };
 
 export function resolveLLMConfig(config?: LLMConfig): LLMConfig | null {
@@ -29,7 +29,7 @@ async function callOpenAI(
   messages: LLMMessage[],
   config: LLMConfig,
 ): Promise<string> {
-  const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
+  const baseUrl = config.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
   const { statusCode, body } = await request(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -50,9 +50,10 @@ async function callOpenAI(
   }
 
   const result = await body.json() as {
-    choices: Array<{ message: { content: string } }>;
+    choices: Array<{ message: { content: string | null; reasoning_content?: string } }>;
   };
-  return result.choices[0]?.message?.content || '';
+  const message = result.choices[0]?.message;
+  return message?.content || message?.reasoning_content || '';
 }
 
 async function callOllama(
