@@ -1,84 +1,87 @@
 import { request } from 'undici';
-import { parse as parseHtml } from 'node-html-parser';
 import { ChangelogEntry } from '../types.js';
 import { Provider } from './types.js';
 
-const OPENAI_CHANGELOG_URL = 'https://platform.openai.com/docs/changelog';
+const GITHUB_API_BASE = 'https://api.github.com/repos/openai/openai-node';
+
+interface GitHubRelease {
+  tag_name: string;
+  name: string;
+  body: string;
+  html_url: string;
+  published_at: string;
+}
 
 export class OpenAIProvider implements Provider {
   name = 'openai';
 
   async fetch(): Promise<ChangelogEntry[]> {
-    const html = await this.fetchPage(OPENAI_CHANGELOG_URL);
-    return this.parseChangelog(html);
+    const releases = await this.fetchGitHubReleases();
+    return this.parseReleases(releases);
   }
 
-  private async fetchPage(url: string): Promise<string> {
-    const { statusCode, body } = await request(url, {
+  private async fetchGitHubReleases(): Promise<GitHubRelease[]> {
+    const { statusCode, body } = await request(`${GITHUB_API_BASE}/releases?per_page=30`, {
       headers: {
         'User-Agent': 'changelog-impact/0.1.0',
-        Accept: 'text/html',
+        Accept: 'application/vnd.github+json',
       },
     });
     if (statusCode !== 200) {
-      throw new Error(`OpenAI changelog fetch failed: HTTP ${statusCode}`);
+      throw new Error(`OpenAI GitHub releases fetch failed: HTTP ${statusCode}`);
     }
-    return await body.text();
+    return await body.json() as GitHubRelease[];
   }
 
-  private parseChangelog(html: string): ChangelogEntry[] {
-    const root = parseHtml(html);
+  private parseReleases(releases: GitHubRelease[]): ChangelogEntry[] {
     const entries: ChangelogEntry[] = [];
 
-    const articles = root.querySelectorAll('article, .changelog-entry, [class*="changelog"], [class*="change-log"]');
-    if (articles.length > 0) {
-      for (const article of articles) {
-        const titleEl = article.querySelector('h2, h3, h4, a[href]');
-        const dateEl = article.querySelector('time, [datetime], .date, [class*="date"]');
-        const linkEl = article.querySelector('a[href]');
+    for (const release of releases) {
+      const title = release.name || release.tag_name;
+      const date = release.published_at?.slice(0, 10) || '';
+      const link = release.html_url;
+      const bodyLines = (release.body || '').split('\n').filter((l: string) => l.trim());
 
-        const title = titleEl?.textContent?.trim() || '';
-        const date = dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '';
-        const link = linkEl?.getAttribute('href') || '';
-        const summary = article.textContent?.trim().slice(0, 500) || '';
+      const features: string[] = [];
+      const apiChanges: string[] = [];
 
-        if (title) {
-          entries.push({
-            title,
-            date,
-            link: link.startsWith('http') ? link : `https://platform.openai.com${link}`,
-            category: 'feature',
-            summary: summary.slice(0, 300),
-            provider: 'openai',
-          });
+      let currentSection = '';
+      for (const line of bodyLines) {
+        const trimmed = line.trim();
+        if (/^#{1,3}\s+features/i.test(trimmed)) {
+          currentSection = 'features';
+          continue;
+        }
+        if (/^#{1,3}\s+(api|breaking|deprecat|bug|fix)/i.test(trimmed)) {
+          currentSection = 'api';
+          continue;
+        }
+        if (/^#{1,3}\s/.test(trimmed)) {
+          currentSection = '';
+          continue;
+        }
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+          if (currentSection === 'api') {
+            apiChanges.push(trimmed.slice(2));
+          } else {
+            features.push(trimmed.slice(2));
+          }
         }
       }
-    }
 
-    if (entries.length === 0) {
-      entries.push(...this.fallbackParse(root));
-    }
+      const summaryParts = [...apiChanges, ...features].slice(0, 5);
+      const summary = summaryParts.length > 0
+        ? summaryParts.join('; ')
+        : bodyLines.slice(0, 3).join(' ').slice(0, 300);
 
-    return entries;
-  }
-
-  private fallbackParse(root: ReturnType<typeof parseHtml>): ChangelogEntry[] {
-    const entries: ChangelogEntry[] = [];
-    const links = root.querySelectorAll('a[href*="/changelog"], a[href*="/updates"], a[href*="/blog"]');
-
-    for (const link of links) {
-      const title = link.textContent?.trim() || '';
-      const href = link.getAttribute('href') || '';
-      if (title && href) {
-        entries.push({
-          title,
-          date: '',
-          link: href.startsWith('http') ? href : `https://platform.openai.com${href}`,
-          category: 'feature',
-          summary: '',
-          provider: 'openai',
-        });
-      }
+      entries.push({
+        title,
+        date,
+        link,
+        category: 'feature',
+        summary,
+        provider: 'openai',
+      });
     }
 
     return entries;
