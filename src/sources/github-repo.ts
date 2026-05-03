@@ -1,6 +1,6 @@
-import { request } from 'undici';
 import { ChangelogEntry, GitHubCommit } from '../types.js';
 import { Source } from './types.js';
+import { httpGet, getGitHubAuthHeaders } from '../http.js';
 
 export class GitHubRepoSource implements Source {
   name: string;
@@ -29,18 +29,13 @@ export class GitHubRepoSource implements Source {
 
   private async fetchReleases(): Promise<ChangelogEntry[]> {
     try {
-      const { statusCode, body } = await request(
+      const { statusCode, body } = await httpGet(
         `https://api.github.com/repos/${this.owner}/${this.repo}/releases?per_page=30`,
-        {
-          headers: {
-            'User-Agent': 'changelog-impact/0.2.0',
-            Accept: 'application/vnd.github+json',
-          },
-        },
+        { headers: getGitHubAuthHeaders() },
       );
       if (statusCode !== 200) return [];
 
-      const releases = await body.json() as Array<{
+      const releases = JSON.parse(body) as Array<{
         tag_name: string;
         name: string;
         body: string;
@@ -63,20 +58,15 @@ export class GitHubRepoSource implements Source {
   }
 
   private async fetchCommits(): Promise<ChangelogEntry[]> {
-    const { statusCode, body } = await request(
+    const { statusCode, body } = await httpGet(
       `https://api.github.com/repos/${this.owner}/${this.repo}/commits?sha=${this.branch}&per_page=30`,
-      {
-        headers: {
-          'User-Agent': 'changelog-impact/0.2.0',
-          Accept: 'application/vnd.github+json',
-        },
-      },
+      { headers: getGitHubAuthHeaders() },
     );
     if (statusCode !== 200) {
       throw new Error(`GitHub commits fetch failed for ${this.owner}/${this.repo}: HTTP ${statusCode}`);
     }
 
-    const commits = await body.json() as GitHubCommit[];
+    const commits = JSON.parse(body) as GitHubCommit[];
 
     return commits.map((c) => {
       const lines = c.message.split('\n');

@@ -1,9 +1,9 @@
-import { loadConfig, resolveRepoPath, getDefaultSources, ensureReportsDir } from '../config.js';
+import { ProgramError } from '../errors.js';
+import { loadConfig, resolveRepoPath, getDefaultSources, ensureReportsDir, getDefaultSince } from '../config.js';
 import { readCache } from '../cache.js';
 import { scanRepo } from '../scanner.js';
 import { buildReportData, writeReport } from '../reporter.js';
 import { enrichScanResultsWithLLM, resolveLLMConfig } from '../llm.js';
-import { ChangelogEntry } from '../types.js';
 
 export async function runScan(
   cwd: string,
@@ -18,18 +18,18 @@ export async function runScan(
   if (sourceName) {
     const found = enabledSources.find((s) => s.name === sourceName);
     if (!found) {
-      console.error(`Source "${sourceName}" is not enabled. Check your config.`);
-      process.exit(1);
+      const available = enabledSources.map((s) => s.name).join(', ');
+      throw new ProgramError(`Source "${sourceName}" is not enabled. Available sources: ${available}`);
     }
   }
 
-  const since = options.since || '1970-01-01';
+  const since = options.since || getDefaultSince();
   const sources = sourceName ? [sourceName] : enabledSources.map((s) => s.name);
 
   for (const source of sources) {
     const cached = readCache(source);
     if (!cached) {
-      console.log(`No cached data for ${source}. Run "changelog-impact fetch" first.`);
+      console.log(`No cached data for ${source}. Run "changelog-impact fetch --source ${source}" first.`);
       continue;
     }
 
@@ -44,7 +44,7 @@ export async function runScan(
     const sourceConfig = enabledSources.find((s) => s.name === source);
     const sourceType = sourceConfig?.type || 'changelog';
 
-    console.log(`Scanning repo for ${source} impact (${entries.length} entries)...`);
+    console.log(`Scanning repo for ${source} impact (${entries.length} entries since ${since})...`);
     let results = scanRepo(repoPath, entries, source);
 
     const llmConfig = resolveLLMConfig(config?.llm);

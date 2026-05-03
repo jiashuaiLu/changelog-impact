@@ -1,4 +1,4 @@
-import { resolveRepoPath, getDefaultSources, ensureReportsDir, loadConfig } from '../config.js';
+import { resolveRepoPath, getDefaultSources, ensureReportsDir, loadConfig, getDefaultSince } from '../config.js';
 import { StripeSource } from '../sources/stripe.js';
 import { OpenAISource } from '../sources/openai.js';
 import { GitHubRepoSource } from '../sources/github-repo.js';
@@ -8,13 +8,14 @@ import { scanRepo } from '../scanner.js';
 import { buildReportData, writeReport } from '../reporter.js';
 import { enrichScanResultsWithLLM, resolveLLMConfig } from '../llm.js';
 import { Source } from '../sources/types.js';
+import { ProgramError } from '../errors.js';
 
 export async function runRun(
   cwd: string,
   options: { repo?: string; source?: string; since?: string },
 ): Promise<void> {
   const repoPath = resolveRepoPath(options.repo, cwd);
-  const since = options.since || '1970-01-01';
+  const since = options.since || getDefaultSince();
   const sourceName = options.source;
 
   const config = loadConfig(cwd);
@@ -37,8 +38,7 @@ export async function runRun(
   }
 
   if (sources.length === 0) {
-    console.error('No sources configured. Run "changelog-impact init" first.');
-    process.exit(1);
+    throw new ProgramError('No sources configured. Run "changelog-impact init" first.');
   }
 
   for (const source of sources) {
@@ -57,7 +57,8 @@ export async function runRun(
       writeCache(source.name, entries);
       console.log(`  Total: ${entries.length} entries, ${newEntries.length} new`);
     } catch (err) {
-      console.error(`  Fetch error: ${err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  Fetch error: ${msg}`);
       const cached = readCache(source.name);
       if (cached) {
         entries = cached.entries;
@@ -75,7 +76,7 @@ export async function runRun(
       });
     }
 
-    console.log(`[${source.name}] Scanning repo...`);
+    console.log(`[${source.name}] Scanning repo (since ${since})...`);
     let results = scanRepo(repoPath, entries, source.name);
 
     const llmConfig = resolveLLMConfig(config?.llm);

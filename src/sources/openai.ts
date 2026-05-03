@@ -1,16 +1,8 @@
-import { request } from 'undici';
 import { ChangelogEntry } from '../types.js';
 import { Source } from './types.js';
+import { httpGet, getGitHubAuthHeaders } from '../http.js';
 
 const GITHUB_API_BASE = 'https://api.github.com/repos/openai/openai-node';
-
-interface GitHubRelease {
-  tag_name: string;
-  name: string;
-  body: string;
-  html_url: string;
-  published_at: string;
-}
 
 export class OpenAISource implements Source {
   name = 'openai';
@@ -21,20 +13,30 @@ export class OpenAISource implements Source {
     return this.parseReleases(releases);
   }
 
-  private async fetchGitHubReleases(): Promise<GitHubRelease[]> {
-    const { statusCode, body } = await request(`${GITHUB_API_BASE}/releases?per_page=30`, {
-      headers: {
-        'User-Agent': 'changelog-impact/0.2.0',
-        Accept: 'application/vnd.github+json',
-      },
-    });
+  private async fetchGitHubReleases(): Promise<Array<{
+    tag_name: string;
+    name: string;
+    body: string;
+    html_url: string;
+    published_at: string;
+  }>> {
+    const { statusCode, body } = await httpGet(
+      `${GITHUB_API_BASE}/releases?per_page=30`,
+      { headers: getGitHubAuthHeaders() },
+    );
     if (statusCode !== 200) {
       throw new Error(`OpenAI GitHub releases fetch failed: HTTP ${statusCode}`);
     }
-    return await body.json() as GitHubRelease[];
+    return JSON.parse(body);
   }
 
-  private parseReleases(releases: GitHubRelease[]): ChangelogEntry[] {
+  private parseReleases(releases: Array<{
+    tag_name: string;
+    name: string;
+    body: string;
+    html_url: string;
+    published_at: string;
+  }>): ChangelogEntry[] {
     const entries: ChangelogEntry[] = [];
 
     for (const release of releases) {

@@ -1,26 +1,28 @@
 import { createGitHubIssue } from '../github.js';
+import { ProgramError } from '../errors.js';
 import fs from 'node:fs';
 import { ReportData } from '../types.js';
 
 export async function runGithubIssue(
-  options: { repo: string; token: string; report: string },
+  options: { repo: string; token?: string; report: string },
 ): Promise<void> {
-  const { repo: repoFlag, token, report: reportPath } = options;
+  const token = options.token || process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new ProgramError('GitHub token required. Set GITHUB_TOKEN env var or use --token flag.');
+  }
 
-  const [owner, repo] = repoFlag.split('/');
+  const [owner, repo] = options.repo.split('/');
   if (!owner || !repo) {
-    console.error('Invalid repo format. Use "owner/name".');
-    process.exit(1);
+    throw new ProgramError('Invalid repo format. Use "owner/name".');
   }
 
-  if (!fs.existsSync(reportPath)) {
-    console.error(`Report file not found: ${reportPath}`);
-    process.exit(1);
+  if (!fs.existsSync(options.report)) {
+    throw new ProgramError(`Report file not found: ${options.report}`);
   }
 
-  const content = fs.readFileSync(reportPath, 'utf-8');
+  const content = fs.readFileSync(options.report, 'utf-8');
   const sourceMatch = content.match(/\*\*Source\*:\s*(\S+)/);
-  const sourceTypeMatch = content.match(/\*\*Source\*:\s*\S+\s+\((\S+)\)/);
+  const sourceTypeMatch = content.match(/\((\S+)\)/);
   const sinceMatch = content.match(/\*\*Period\*:\s*(\S+)\s*~/);
   const untilMatch = content.match(/~\s*(\S+)/);
 
@@ -48,10 +50,10 @@ export async function runGithubIssue(
 
   console.log(`Creating GitHub issue in ${owner}/${repo}...`);
   try {
-    const url = await createGitHubIssue(owner, repo, token, reportPath, data);
+    const url = await createGitHubIssue(owner, repo, token, options.report, data);
     console.log(`Issue created: ${url}`);
   } catch (err) {
-    console.error(`Failed to create issue: ${err}`);
-    process.exit(1);
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new ProgramError(`Failed to create issue: ${msg}`);
   }
 }

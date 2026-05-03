@@ -1,6 +1,6 @@
-import { request } from 'undici';
 import fs from 'node:fs';
 import { ReportData } from './types.js';
+import { httpPost } from './http.js';
 
 export async function createGitHubIssue(
   owner: string,
@@ -17,27 +17,22 @@ export async function createGitHubIssue(
   if (data.deprecationCount > 0) labels.push('deprecation');
   if (data.securityCount > 0) labels.push('security');
 
-  const body = content;
-
-  const { statusCode, body: respBody } = await request(
+  const { statusCode, body } = await httpPost(
     `https://api.github.com/repos/${owner}/${repo}/issues`,
     {
-      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'changelog-impact/0.1.0',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title, body, labels }),
+      body: JSON.stringify({ title, body: content, labels }),
     },
   );
 
   if (statusCode !== 201) {
-    const text = await respBody.text();
-    throw new Error(`GitHub API error: HTTP ${statusCode} — ${text}`);
+    throw new Error(`GitHub API error: HTTP ${statusCode}`);
   }
 
-  const result = await respBody.json() as { html_url: string };
+  const result = JSON.parse(body) as { html_url: string };
   return result.html_url;
 }

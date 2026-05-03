@@ -1,6 +1,6 @@
 {
   "name": "changelog-impact",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Changelog-to-Impact Copilot: track Stripe/OpenAI changes, scan repo, generate local impact reports.",
   "type": "module",
   "bin": {

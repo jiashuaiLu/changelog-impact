@@ -27,11 +27,28 @@ export function getDefaultLLM(): LLMConfig {
   return { ...DEFAULT_LLM };
 }
 
+export function getDefaultSince(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+
 export function loadConfig(cwd: string): AppConfig | null {
   const configPath = path.join(cwd, CONFIG_FILENAME);
   if (!fs.existsSync(configPath)) return null;
   const raw = fs.readFileSync(configPath, 'utf-8');
-  return yaml.load(raw) as AppConfig;
+  try {
+    const parsed = yaml.load(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      console.error(`Invalid config file: ${configPath}. Expected a YAML object.`);
+      return null;
+    }
+    return parsed as AppConfig;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Failed to parse config file ${configPath}: ${msg}`);
+    return null;
+  }
 }
 
 export function saveConfig(cwd: string, config: AppConfig): void {
@@ -41,7 +58,11 @@ export function saveConfig(cwd: string, config: AppConfig): void {
 }
 
 export function resolveRepoPath(repoFlag: string | undefined, cwd: string): string {
-  return repoFlag ? path.resolve(repoFlag) : cwd;
+  const repoPath = repoFlag ? path.resolve(repoFlag) : cwd;
+  if (!fs.existsSync(repoPath)) {
+    throw new Error(`Repo path does not exist: ${repoPath}`);
+  }
+  return repoPath;
 }
 
 export function ensureCacheDir(): string {

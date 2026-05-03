@@ -1,5 +1,5 @@
-import { request } from 'undici';
 import { LLMConfig, ChangeCategory, ChangelogEntry, ScanHit } from './types.js';
+import { httpPost } from './http.js';
 
 const DEFAULT_CONFIG: LLMConfig = {
   enabled: false,
@@ -21,17 +21,12 @@ interface LLMMessage {
   content: string;
 }
 
-interface LLMResponse {
-  content: string;
-}
-
 async function callOpenAI(
   messages: LLMMessage[],
   config: LLMConfig,
 ): Promise<string> {
   const baseUrl = config.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-  const { statusCode, body } = await request(`${baseUrl}/chat/completions`, {
-    method: 'POST',
+  const { statusCode, body } = await httpPost(`${baseUrl}/chat/completions`, {
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
@@ -42,14 +37,14 @@ async function callOpenAI(
       max_tokens: config.maxTokens,
       temperature: 0.1,
     }),
+    timeout: 30_000,
   });
 
   if (statusCode !== 200) {
-    const text = await body.text();
-    throw new Error(`LLM API error: HTTP ${statusCode} — ${text}`);
+    throw new Error(`LLM API error: HTTP ${statusCode}`);
   }
 
-  const result = await body.json() as {
+  const result = JSON.parse(body) as {
     choices: Array<{ message: { content: string | null; reasoning_content?: string } }>;
   };
   const message = result.choices[0]?.message;
@@ -61,22 +56,21 @@ async function callOllama(
   config: LLMConfig,
 ): Promise<string> {
   const baseUrl = config.baseUrl || 'http://localhost:11434';
-  const { statusCode, body } = await request(`${baseUrl}/api/chat`, {
-    method: 'POST',
+  const { statusCode, body } = await httpPost(`${baseUrl}/api/chat`, {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: config.model,
       messages,
       stream: false,
     }),
+    timeout: 60_000,
   });
 
   if (statusCode !== 200) {
-    const text = await body.text();
-    throw new Error(`Ollama API error: HTTP ${statusCode} — ${text}`);
+    throw new Error(`Ollama API error: HTTP ${statusCode}`);
   }
 
-  const result = await body.json() as { message: { content: string } };
+  const result = JSON.parse(body) as { message: { content: string } };
   return result.message?.content || '';
 }
 
@@ -113,10 +107,7 @@ Categories:
 Respond with ONLY one word: breaking, deprecation, security, or feature`;
 
   try {
-    const result = await callLLM(
-      [{ role: 'user', content: prompt }],
-      config,
-    );
+    const result = await callLLM([{ role: 'user', content: prompt }], config);
     const cleaned = result.trim().toLowerCase();
     if (['breaking', 'deprecation', 'security', 'feature'].includes(cleaned)) {
       return cleaned as ChangeCategory;
@@ -140,10 +131,7 @@ Summary: ${summary}
 Respond with only the summary, no labels or prefixes.`;
 
   try {
-    const result = await callLLM(
-      [{ role: 'user', content: prompt }],
-      config,
-    );
+    const result = await callLLM([{ role: 'user', content: prompt }], config);
     return result.trim();
   } catch {
     return '';
@@ -178,10 +166,7 @@ Explain in 2-3 sentences:
 Respond with only the explanation, no labels or prefixes.`;
 
   try {
-    const result = await callLLM(
-      [{ role: 'user', content: prompt }],
-      config,
-    );
+    const result = await callLLM([{ role: 'user', content: prompt }], config);
     return result.trim();
   } catch {
     return '';
@@ -213,10 +198,7 @@ Provide numbered, actionable steps. Be specific about what to change in the code
 Respond with only the steps, one per line, numbered.`;
 
   try {
-    const result = await callLLM(
-      [{ role: 'user', content: prompt }],
-      config,
-    );
+    const result = await callLLM([{ role: 'user', content: prompt }], config);
     return result.trim();
   } catch {
     return '';

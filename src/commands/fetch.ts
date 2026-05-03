@@ -6,6 +6,7 @@ import { classifyEntriesWithLLM } from '../classifier.js';
 import { writeCache, readCache, diffEntries } from '../cache.js';
 import { Source } from '../sources/types.js';
 import { ChangelogEntry } from '../types.js';
+import { ProgramError } from '../errors.js';
 
 export async function runFetch(cwd: string, options?: { source?: string }): Promise<void> {
   const config = loadConfig(cwd);
@@ -15,8 +16,8 @@ export async function runFetch(cwd: string, options?: { source?: string }): Prom
   if (options?.source) {
     const filtered = enabledSources.filter((s) => s.name === options.source);
     if (filtered.length === 0) {
-      console.error(`Source "${options.source}" is not enabled. Check your config.`);
-      process.exit(1);
+      const available = enabledSources.map((s) => s.name).join(', ');
+      throw new ProgramError(`Source "${options.source}" is not enabled. Available sources: ${available}`);
     }
   }
 
@@ -59,7 +60,8 @@ export async function runFetch(cwd: string, options?: { source?: string }): Prom
       }
       console.log('');
     } catch (err) {
-      console.error(`  Error fetching ${source.name}: ${err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  Error fetching ${source.name}: ${msg}`);
     }
   }
 }
